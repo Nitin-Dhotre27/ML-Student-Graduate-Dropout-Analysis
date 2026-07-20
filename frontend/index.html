@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Dropout Risk Predictor</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --accent: #4338ca;
+    --accent-light: #eef2ff;
+    --low: #16a34a;
+    --medium: #ca8a04;
+    --high: #ea580c;
+    --critical: #dc2626;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 45%, #312e81 100%);
+    min-height: 100vh;
+    color: var(--ink);
+    padding: 32px 16px 64px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 28px; color: #f1f5f9; }
+  header h1 { font-size: 1.9rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: #cbd5e1; font-size: 0.95rem; }
+
+  .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px 26px;
+    box-shadow: 0 20px 45px rgba(0,0,0,0.25);
+  }
+  .card h2 { margin-top: 0; font-size: 1.1rem; }
+
+  .field { margin-bottom: 14px; }
+  label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  input, select {
+    width: 100%; padding: 10px 12px; border-radius: 9px; border: 1.5px solid var(--border);
+    font-size: 0.95rem; background: #f8fafc; transition: border-color .15s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  button {
+    width: 100%; padding: 13px; margin-top: 6px; border: none; border-radius: 10px;
+    background: var(--accent); color: white; font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: transform .1s, background .15s;
+  }
+  button:hover { background: #372fa8; }
+  button:disabled { background: #a5a6c9; cursor: not-allowed; }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted);
+    margin-bottom: 18px; justify-content: center;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+  .dot.ok { background: var(--low); }
+  .dot.bad { background: var(--critical); }
+
+  .result { text-align: center; }
+  .result .placeholder { color: var(--muted); font-size: 0.9rem; padding: 40px 10px; }
+  .badge {
+    display: inline-block; padding: 6px 16px; border-radius: 999px; font-weight: 700;
+    font-size: 0.85rem; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 14px;
+  }
+  .badge.low { background: #dcfce7; color: var(--low); }
+  .badge.medium { background: #fef9c3; color: var(--medium); }
+  .badge.high { background: #ffedd5; color: var(--high); }
+  .badge.critical { background: #fee2e2; color: var(--critical); }
+
+  .prob-big { font-size: 2.6rem; font-weight: 800; margin: 6px 0 2px; }
+  .prob-label { color: var(--muted); font-size: 0.85rem; margin-bottom: 18px; }
+
+  .bar-track { background: #e2e8f0; border-radius: 999px; height: 10px; overflow: hidden; margin-bottom: 22px; }
+  .bar-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
+
+  .imp-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .imp-name { width: 130px; font-size: 0.78rem; color: var(--muted); text-align: right; flex-shrink: 0; }
+  .imp-bar-track { flex: 1; background: var(--accent-light); border-radius: 6px; height: 12px; overflow: hidden; }
+  .imp-bar-fill { height: 100%; background: var(--accent); border-radius: 6px; }
+  .imp-val { width: 42px; font-size: 0.75rem; color: var(--muted); }
+
+  footer { text-align: center; color: #94a3b8; font-size: 0.78rem; margin-top: 26px; }
+  .cfg { text-align:center; margin-bottom: 14px; }
+  .cfg input { max-width: 340px; margin: 0 auto; text-align:center; font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎓 Student Dropout Risk Predictor</h1>
+    <p>Two-layer stacking ensemble — Random Forest + XGBoost + LightGBM &rarr; Neural Network meta-learner</p>
+  </header>
+
+  <div class="cfg">
+    <input id="apiBase" value="http://localhost:8000" spellcheck="false" />
+  </div>
+  <div class="status-bar"><span id="statusDot" class="dot"></span><span id="statusText">Checking API...</span></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Student Activity</h2>
+      <form id="predictForm">
+        <div class="row2">
+          <div class="field">
+            <label>Portal Access Count</label>
+            <input type="number" id="access" value="120" min="0" required />
+          </div>
+          <div class="field">
+            <label>Tests Taken</label>
+            <input type="number" id="tests" value="6" min="0" required />
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Tests Grade</label>
+            <select id="tests_grade">
+              <option>A</option><option selected>B</option><option>C</option>
+              <option>D</option><option>E</option><option>FX</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Exam Score (0-100)</label>
+            <input type="number" id="exam" value="72.5" min="0" max="100" step="0.1" required />
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Project Milestones Completed</label>
+            <input type="number" id="project" value="3" min="0" required />
+          </div>
+          <div class="field">
+            <label>Project Grade</label>
+            <select id="project_grade">
+              <option selected>A</option><option>B</option><option>C</option>
+              <option>D</option><option>E</option><option>FX</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Assignments Submitted</label>
+            <input type="number" id="assignments" value="10" min="0" required />
+          </div>
+          <div class="field">
+            <label>Result Points (0-100)</label>
+            <input type="number" id="result_points" value="78" min="0" max="100" step="0.1" required />
+          </div>
+        </div>
+        <button type="submit" id="submitBtn">Predict Risk</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Prediction</h2>
+      <div class="result" id="result">
+        <div class="placeholder">Fill in the form and click "Predict Risk" to see this student's dropout risk.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>What drives this model? (Feature importance)</h2>
+    <div id="importance"><div class="placeholder">Loading...</div></div>
+  </div>
+
+  <footer>Model trained via a two-layer stacking pipeline. This tool supports early-intervention decisions — it does not replace advisor judgment.</footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function apiBase() { return $("apiBase").value.replace(/\/$/, ""); }
+
+async function checkHealth() {
+  try {
+    const res = await fetch(`${apiBase()}/health`);
+    const data = await res.json();
+    $("statusDot").className = "dot " + (data.model_ready ? "ok" : "bad");
+    $("statusText").textContent = data.model_ready
+      ? "API connected — model ready"
+      : "API connected — model NOT trained yet (run python -m src.train)";
+  } catch (e) {
+    $("statusDot").className = "dot bad";
+    $("statusText").textContent = "Cannot reach API at " + apiBase();
+  }
+}
+
+async function loadImportance() {
+  try {
+    const res = await fetch(`${apiBase()}/feature-importance`);
+    const data = await res.json();
+    const entries = Object.entries(data);
+    if (!entries.length) { $("importance").innerHTML = '<div class="placeholder">No importance data yet.</div>'; return; }
+    const max = Math.max(...entries.map(([, v]) => v));
+    $("importance").innerHTML = entries.map(([name, val]) => `
+      <div class="imp-row">
+        <div class="imp-name">${name}</div>
+        <div class="imp-bar-track"><div class="imp-bar-fill" style="width:${(val/max*100).toFixed(1)}%"></div></div>
+        <div class="imp-val">${(val*100).toFixed(1)}%</div>
+      </div>`).join("");
+  } catch (e) {
+    $("importance").innerHTML = '<div class="placeholder">Could not load feature importance.</div>';
+  }
+}
+
+const riskColor = { low: "var(--low)", medium: "var(--medium)", high: "var(--high)", critical: "var(--critical)" };
+
+$("predictForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("submitBtn").disabled = true;
+  $("submitBtn").textContent = "Predicting...";
+
+  const payload = {
+    access: parseInt($("access").value),
+    tests: parseInt($("tests").value),
+    tests_grade: $("tests_grade").value,
+    exam: parseFloat($("exam").value),
+    project: parseInt($("project").value),
+    project_grade: $("project_grade").value,
+    assignments: parseInt($("assignments").value),
+    result_points: parseFloat($("result_points").value),
+  };
+
+  try {
+    const res = await fetch(`${apiBase()}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || "Prediction failed");
+    const data = await res.json();
+    const pctNonDropout = (data.probability_non_dropout * 100).toFixed(1);
+    const pctDropout = (data.probability_dropout * 100).toFixed(1);
+
+    $("result").innerHTML = `
+      <div class="badge ${data.risk_level}">${data.risk_level} risk</div>
+      <div class="prob-big" style="color:${riskColor[data.risk_level]}">${pctNonDropout}%</div>
+      <div class="prob-label">estimated probability of NOT dropping out</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pctNonDropout}%; background:${riskColor[data.risk_level]}"></div></div>
+      <p style="color:var(--muted); font-size:0.85rem;">
+        Model prediction: <strong>${data.prediction.replace('_',' ')}</strong><br/>
+        Dropout probability: <strong>${pctDropout}%</strong>
+      </p>`;
+  } catch (err) {
+    $("result").innerHTML = `<div class="placeholder" style="color:var(--critical)">Error: ${err.message}</div>`;
+  } finally {
+    $("submitBtn").disabled = false;
+    $("submitBtn").textContent = "Predict Risk";
+  }
+});
+
+$("apiBase").addEventListener("change", () => { checkHealth(); loadImportance(); });
+checkHealth();
+loadImportance();
+</script>
+</body>
+</html>

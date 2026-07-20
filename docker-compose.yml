@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  backend:
+    build: .
+    container_name: dropout-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+
+  frontend:
+    image: python:3.11-slim
+    container_name: dropout-frontend
+    working_dir: /site
+    volumes:
+      - ./frontend:/site
+    command: python -m http.server 5500
+    ports:
+      - "5500:5500"
+    depends_on:
+      - backend
